@@ -2,7 +2,11 @@
 """
 Full ML Pipeline for Blood Pressure Prediction - MultiModal Genomics
 Uses ONLY leak-free features (no BP variability)
-Includes deep learning models, ablation studies, SHAP analysis
+Benchmarks 8 classical/tree-based models, ablation studies, and SHAP analysis.
+
+Note: FT-Transformer and SAINT are trained separately in 06_deep_models_gpu.py
+with full-scale architectures (d_model=192, 8 heads, 3 layers). The results
+reported in the paper for those two models come from script 06, not this script.
 """
 
 import os
@@ -25,7 +29,6 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import Ridge, Lasso, ElasticNet, LogisticRegression
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, GradientBoostingRegressor, GradientBoostingClassifier
-from sklearn.neural_network import MLPRegressor, MLPClassifier
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error, roc_auc_score, roc_curve, confusion_matrix
 
 warnings.filterwarnings('ignore')
@@ -35,7 +38,6 @@ HAS_XGBOOST = False
 HAS_LIGHTGBM = False
 HAS_CATBOOST = False
 HAS_SHAP = False
-HAS_TORCH = False
 
 try:
     import xgboost as xgb
@@ -60,15 +62,6 @@ try:
     HAS_SHAP = True
 except ImportError:
     print("[WARNING] SHAP not available")
-
-try:
-    import torch
-    import torch.nn as nn
-    import torch.optim as optim
-    from torch.utils.data import TensorDataset, DataLoader
-    HAS_TORCH = True
-except ImportError:
-    print("[WARNING] PyTorch not available — using sklearn MLP as FTTransformer/SAINT proxy")
 
 # Setup paths
 OUT = os.path.dirname(os.path.abspath(__file__))
@@ -122,68 +115,6 @@ def load_data():
     return df, feature_groups
 
 
-# ============================================================================
-# DEEP LEARNING MODELS (only defined if PyTorch is available)
-# ============================================================================
-
-if HAS_TORCH:
-    class FTTransformer(nn.Module):
-        """Feature Tokenizer + Transformer"""
-        def __init__(self, n_features, d_model=64, n_heads=4, n_layers=3, d_ff=128, dropout=0.1):
-            super().__init__()
-            self.n_features = n_features
-            self.d_model = d_model
-            self.feature_embeddings = nn.Linear(1, d_model)
-            self.cls_token = nn.Parameter(torch.randn(1, 1, d_model) * 0.02)
-            encoder_layer = nn.TransformerEncoderLayer(
-                d_model=d_model, nhead=n_heads, dim_feedforward=d_ff,
-                dropout=dropout, batch_first=True, norm_first=True
-            )
-            self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=n_layers)
-            self.layer_norm = nn.LayerNorm(d_model)
-
-        def forward(self, x, task='regression'):
-            batch_size = x.size(0)
-            x_embed = self.feature_embeddings(x.unsqueeze(-1))
-            cls_tokens = self.cls_token.expand(batch_size, -1, -1)
-            x_embed = torch.cat([cls_tokens, x_embed], dim=1)
-            x_out = self.transformer(x_embed)
-            cls_out = x_out[:, 0, :]
-            return self.layer_norm(cls_out)
-
-    class SAINT(nn.Module):
-        """Self-Attention and Intersample Attention"""
-        def __init__(self, n_features, d_model=32, n_heads=4, n_layers=2, dropout=0.1):
-            super().__init__()
-            self.n_features = n_features
-            self.d_model = d_model
-            self.feature_embeddings = nn.Linear(1, d_model)
-            self.self_attn_layers = nn.ModuleList([
-                nn.MultiheadAttention(d_model, n_heads, dropout=dropout, batch_first=True)
-                for _ in range(n_layers)
-            ])
-            self.inter_attn_layers = nn.ModuleList([
-                nn.MultiheadAttention(d_model, n_heads, dropout=dropout, batch_first=True)
-                for _ in range(n_layers)
-            ])
-            mlp_dim = n_features * d_model
-            self.mlp = nn.Sequential(
-                nn.Linear(mlp_dim, 256), nn.ReLU(), nn.Dropout(dropout),
-                nn.Linear(256, 128), nn.ReLU(), nn.Dropout(dropout)
-            )
-
-        def forward(self, x):
-            batch_size = x.size(0)
-            x_embed = self.feature_embeddings(x.unsqueeze(-1))
-            for self_attn, inter_attn in zip(self.self_attn_layers, self.inter_attn_layers):
-                x_self, _ = self_attn(x_embed, x_embed, x_embed)
-                x_embed = x_embed + x_self
-                x_perm = x_embed.permute(1, 0, 2)
-                x_inter, _ = inter_attn(x_perm, x_perm, x_perm)
-                x_embed = x_embed + x_inter.permute(1, 0, 2)
-            return self.mlp(x_embed.reshape(batch_size, -1))
-
-
 
 # ============================================================================
 # EVALUATION FUNCTION
@@ -201,11 +132,6 @@ def evaluate_all_models(df, feature_cols, target_col, task='regression', k=5):
 
     X = df[feature_cols].values.astype(np.float32)
     y = df[target_col].values.astype(np.float32)
-
-    # Prepare device for deep learning
-    device = 'cpu'
-    if HAS_TORCH:
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     kf = KFold(n_splits=k, shuffle=True, random_state=SEED)
     fold_results = []
@@ -409,160 +335,8 @@ def evaluate_all_models(df, feature_cols, target_col, task='regression', k=5):
                 fold_data['CatBoost_AUROC'] = auroc
                 print(f"AUROC={auroc:.4f}")
 
-        # ===== DEEP LEARNING MODELS =====
-        if HAS_TORCH:
-            # FTTransformer (PyTorch)
-            print("  Training FTTransformer...", end=' ', flush=True)
-            n_features = X_train_scaled.shape[1]
-            ft_model = FTTransformer(n_features=n_features, d_model=64, n_heads=4, n_layers=3, d_ff=128, dropout=0.1)
-
-            X_train_tensor = torch.FloatTensor(X_train_scaled)
-            y_train_tensor = torch.FloatTensor(y_train)
-            X_test_tensor = torch.FloatTensor(X_test_scaled)
-
-            train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
-            train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-            test_dataset = TensorDataset(X_test_tensor, torch.FloatTensor(y_test))
-            test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
-
-            ft_model_with_head = nn.Sequential(ft_model, nn.Linear(64, 1)).to(device)
-            optimizer = optim.AdamW(ft_model_with_head.parameters(), lr=0.001, weight_decay=1e-5)
-            scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
-            criterion = nn.MSELoss() if task == 'regression' else nn.BCEWithLogitsLoss()
-
-            best_val_loss, patience_counter = float('inf'), 0
-            for epoch in range(100):
-                ft_model_with_head.train()
-                for X_batch, y_batch in train_loader:
-                    X_batch, y_batch = X_batch.to(device), y_batch.to(device)
-                    optimizer.zero_grad()
-                    loss = criterion(ft_model_with_head(X_batch).squeeze(), y_batch)
-                    loss.backward()
-                    nn.utils.clip_grad_norm_(ft_model_with_head.parameters(), 1.0)
-                    optimizer.step()
-                ft_model_with_head.eval()
-                val_loss = sum(criterion(ft_model_with_head(xb.to(device)).squeeze(), yb.to(device)).item() for xb, yb in test_loader)
-                if val_loss < best_val_loss: best_val_loss, patience_counter = val_loss, 0
-                else: patience_counter += 1
-                scheduler.step()
-                if patience_counter >= 15: break
-
-            ft_model_with_head.eval()
-            with torch.no_grad():
-                y_pred_ft = ft_model_with_head(X_test_tensor.to(device)).squeeze().cpu().numpy()
-
-            if task == 'regression':
-                fold_data['FTTransformer_R2'] = r2_score(y_test, y_pred_ft)
-                fold_data['FTTransformer_RMSE'] = np.sqrt(mean_squared_error(y_test, y_pred_ft))
-                fold_data['FTTransformer_MAE'] = mean_absolute_error(y_test, y_pred_ft)
-            else:
-                fold_data['FTTransformer_AUROC'] = roc_auc_score(y_test.astype(int), 1/(1+np.exp(-y_pred_ft)))
-            print(f"Done")
-
-            # SAINT (PyTorch)
-            print("  Training SAINT...", end=' ', flush=True)
-            saint_model = SAINT(n_features=n_features, d_model=32, n_heads=4, n_layers=2, dropout=0.1)
-            saint_with_head = nn.Sequential(saint_model, nn.Linear(128, 1)).to(device)
-            optimizer = optim.AdamW(saint_with_head.parameters(), lr=0.001, weight_decay=1e-5)
-            scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
-
-            best_val_loss, patience_counter = float('inf'), 0
-            for epoch in range(100):
-                saint_with_head.train()
-                for X_batch, y_batch in train_loader:
-                    X_batch, y_batch = X_batch.to(device), y_batch.to(device)
-                    optimizer.zero_grad()
-                    loss = criterion(saint_with_head(X_batch).squeeze(), y_batch)
-                    loss.backward()
-                    nn.utils.clip_grad_norm_(saint_with_head.parameters(), 1.0)
-                    optimizer.step()
-                saint_with_head.eval()
-                val_loss = sum(criterion(saint_with_head(xb.to(device)).squeeze(), yb.to(device)).item() for xb, yb in test_loader)
-                if val_loss < best_val_loss: best_val_loss, patience_counter = val_loss, 0
-                else: patience_counter += 1
-                scheduler.step()
-                if patience_counter >= 15: break
-
-            saint_with_head.eval()
-            with torch.no_grad():
-                y_pred_saint = saint_with_head(X_test_tensor.to(device)).squeeze().cpu().numpy()
-
-            if task == 'regression':
-                fold_data['SAINT_R2'] = r2_score(y_test, y_pred_saint)
-                fold_data['SAINT_RMSE'] = np.sqrt(mean_squared_error(y_test, y_pred_saint))
-                fold_data['SAINT_MAE'] = mean_absolute_error(y_test, y_pred_saint)
-            else:
-                fold_data['SAINT_AUROC'] = roc_auc_score(y_test.astype(int), 1/(1+np.exp(-y_pred_saint)))
-            print(f"Done")
-
-        else:
-            # PyTorch not available — use sklearn MLP as deep learning proxy
-            # Scale target for better MLP convergence
-            from sklearn.preprocessing import StandardScaler as TargetScaler
-            if task == 'regression':
-                target_scaler = TargetScaler()
-                y_train_sc = target_scaler.fit_transform(y_train.reshape(-1, 1)).ravel()
-
-                # FT-Transformer proxy
-                print("  Training FT-Transformer (MLP proxy)...", end=' ', flush=True)
-                ft_proxy = MLPRegressor(
-                    hidden_layer_sizes=(256, 128, 64), activation='relu',
-                    solver='adam', alpha=1e-4, batch_size=256,
-                    learning_rate='adaptive', learning_rate_init=0.001,
-                    max_iter=500, early_stopping=True, n_iter_no_change=20,
-                    validation_fraction=0.1, random_state=SEED, verbose=False
-                )
-                ft_proxy.fit(X_train_scaled, y_train_sc)
-                y_pred_sc = ft_proxy.predict(X_test_scaled)
-                y_pred = target_scaler.inverse_transform(y_pred_sc.reshape(-1, 1)).ravel()
-                fold_data['FTTransformer_R2'] = r2_score(y_test, y_pred)
-                fold_data['FTTransformer_RMSE'] = np.sqrt(mean_squared_error(y_test, y_pred))
-                fold_data['FTTransformer_MAE'] = mean_absolute_error(y_test, y_pred)
-                print(f"R2={fold_data['FTTransformer_R2']:.4f}")
-
-                # SAINT proxy
-                print("  Training SAINT (MLP proxy)...", end=' ', flush=True)
-                saint_proxy = MLPRegressor(
-                    hidden_layer_sizes=(512, 256, 128), activation='relu',
-                    solver='adam', alpha=1e-5, batch_size=256,
-                    learning_rate='adaptive', learning_rate_init=0.001,
-                    max_iter=500, early_stopping=True, n_iter_no_change=20,
-                    validation_fraction=0.1, random_state=SEED+1, verbose=False
-                )
-                saint_proxy.fit(X_train_scaled, y_train_sc)
-                y_pred_sc = saint_proxy.predict(X_test_scaled)
-                y_pred = target_scaler.inverse_transform(y_pred_sc.reshape(-1, 1)).ravel()
-                fold_data['SAINT_R2'] = r2_score(y_test, y_pred)
-                fold_data['SAINT_RMSE'] = np.sqrt(mean_squared_error(y_test, y_pred))
-                fold_data['SAINT_MAE'] = mean_absolute_error(y_test, y_pred)
-                print(f"R2={fold_data['SAINT_R2']:.4f}")
-
-            else:  # classification
-                print("  Training FT-Transformer (MLP proxy)...", end=' ', flush=True)
-                ft_proxy = MLPClassifier(
-                    hidden_layer_sizes=(256, 128, 64), activation='relu',
-                    solver='adam', alpha=1e-4, batch_size=256,
-                    learning_rate='adaptive', learning_rate_init=0.001,
-                    max_iter=500, early_stopping=True, n_iter_no_change=20,
-                    validation_fraction=0.1, random_state=SEED, verbose=False
-                )
-                ft_proxy.fit(X_train_scaled, y_train.astype(int))
-                y_pred_proba = ft_proxy.predict_proba(X_test_scaled)[:, 1]
-                fold_data['FTTransformer_AUROC'] = roc_auc_score(y_test.astype(int), y_pred_proba)
-                print(f"AUROC={fold_data['FTTransformer_AUROC']:.4f}")
-
-                print("  Training SAINT (MLP proxy)...", end=' ', flush=True)
-                saint_proxy = MLPClassifier(
-                    hidden_layer_sizes=(512, 256, 128), activation='relu',
-                    solver='adam', alpha=1e-5, batch_size=256,
-                    learning_rate='adaptive', learning_rate_init=0.001,
-                    max_iter=500, early_stopping=True, n_iter_no_change=20,
-                    validation_fraction=0.1, random_state=SEED+1, verbose=False
-                )
-                saint_proxy.fit(X_train_scaled, y_train.astype(int))
-                y_pred_proba = saint_proxy.predict_proba(X_test_scaled)[:, 1]
-                fold_data['SAINT_AUROC'] = roc_auc_score(y_test.astype(int), y_pred_proba)
-                print(f"AUROC={fold_data['SAINT_AUROC']:.4f}")
+        # Note: FT-Transformer and SAINT are trained in 06_deep_models_gpu.py
+        # with the full-scale architecture used in the paper.
 
         fold_results.append(fold_data)
 
@@ -953,12 +727,9 @@ def main():
         if model in ['Ridge', 'Lasso', 'ElasticNet']:
             colors.append('gray')
             families.append('Linear')
-        elif model in ['RandomForest', 'GradientBoosting', 'XGBoost', 'LightGBM', 'CatBoost']:
+        else:  # Tree-based and gradient boosting
             colors.append('blue')
             families.append('Tree')
-        else:  # FTTransformer, SAINT
-            colors.append('red')
-            families.append('Deep')
 
     fig, ax = plt.subplots(figsize=(12, 7))
     y_pos = np.arange(len(model_names))
@@ -976,8 +747,7 @@ def main():
     from matplotlib.patches import Patch
     legend_elements = [
         Patch(facecolor='gray', alpha=0.7, label='Linear'),
-        Patch(facecolor='blue', alpha=0.7, label='Tree'),
-        Patch(facecolor='red', alpha=0.7, label='Deep')
+        Patch(facecolor='blue', alpha=0.7, label='Tree / Boosting')
     ]
     ax.legend(handles=legend_elements, loc='lower right')
 

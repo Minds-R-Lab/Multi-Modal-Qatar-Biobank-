@@ -42,7 +42,7 @@ We analyzed **14,383 Qatar Biobank participants** using **111 features** across 
 │   └── feature_groups.json         # Feature-to-modality mapping
 ├── scripts/
 │   ├── 01_data_preparation.py      # Data loading, QC, feature grouping
-│   ├── 02_full_ml_pipeline.py      # 10-model benchmark (5-fold CV) + SHAP importance
+│   ├── 02_full_ml_pipeline.py      # 8-model benchmark (5-fold CV) + SHAP importance
 │   ├── 03_enhanced_pipeline.py     # Feature engineering + stacking ensemble
 │   ├── 04_statistical_tests.py     # Pairwise model comparisons + confidence intervals
 │   ├── 05_sensitivity_analysis.py  # MAP-threshold sensitivity for classification
@@ -134,7 +134,7 @@ Loads raw QBB data, applies quality-control filters, defines the four feature mo
 ```bash
 python scripts/02_full_ml_pipeline.py
 ```
-Runs 5-fold cross-validation for all 10 models (Ridge, Lasso, ElasticNet, Random Forest, Gradient Boosting, XGBoost, LightGBM, CatBoost, FT-Transformer, SAINT) with within-fold median imputation. Performs modality ablation using XGBoost across 8 feature configurations. Computes gain-based feature importance.
+Runs 5-fold cross-validation for 8 classical and tree-based models (Ridge, Lasso, ElasticNet, Random Forest, Gradient Boosting, XGBoost, LightGBM, CatBoost) with within-fold median imputation. Performs modality ablation using XGBoost across 8 feature configurations. Computes gain-based feature importance. **Note:** FT-Transformer and SAINT are trained separately in script 06 with their full-scale GPU architectures.
 
 ### Step 3: Enhanced Pipeline
 ```bash
