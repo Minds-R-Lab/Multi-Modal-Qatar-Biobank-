@@ -1,4 +1,4 @@
-# Multi-Modal Machine Learning for Blood Pressure Prediction in Qatar Biobank
+# Multi-Modal Machine Learning for Blood Pressure Prediction in 14,383 Qatar Biobank Participants: Integrating Clinical, Laboratory, Polygenic Risk, and Population-Structure Data
 
 [![Paper](https://img.shields.io/badge/Journal-Artificial%20Intelligence%20in%20Medicine-blue)](https://www.sciencedirect.com/journal/artificial-intelligence-in-medicine)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-green)](https://www.python.org/)
@@ -8,7 +8,7 @@ This repository contains the code and results for the paper:
 
 > **Multi-Modal Machine Learning for Blood Pressure Prediction in 14,383 Qatar Biobank Participants: Integrating Clinical, Laboratory, Polygenic Risk, and Population-Structure Data**
 >
-> Mohamed A. Mabrok, Rana Aldisi, Hatem Zayed
+> Mohamed A. Mabrok, Rana Aldisi, Hatem Zayed*
 >
 > *Submitted to Artificial Intelligence in Medicine*
 
@@ -16,16 +16,16 @@ This repository contains the code and results for the paper:
 
 ## Overview
 
-Hypertension is a leading modifiable risk factor for cardiovascular disease worldwide. This study evaluates whether integrating routine clinical measurements, standard laboratory biomarkers, polygenic risk scores (PRS), and population-structure (PCA) data can improve blood pressure prediction in a Middle Eastern population.
+Hypertension prediction remains challenging in underrepresented populations because blood pressure is influenced by interacting clinical, biochemical, and genetic factors. This study evaluates whether integrating routine clinical measurements, standard laboratory biomarkers, polygenic risk scores (PRS), and population-structure (PCA) data can improve blood pressure prediction in a Middle Eastern population.
 
-We analyzed **14,383 Qatar Biobank participants** using **111 features** across four data modalities and benchmarked **10 machine-learning models** spanning linear, tree-based, gradient-boosting, and deep tabular architectures.
+We analyzed **14,383 Qatar Biobank participants** using **111 features** across four data modalities and benchmarked **10 machine-learning models** spanning linear, tree-based, gradient-boosting, and deep tabular architectures. PRS were obtained from the [Polygenic Score Catalog](https://www.pgscatalog.org/) (Lambert et al. 2021), and population structure was computed using [PLINK 2.0](https://www.cog-genomics.org/plink/2.0/).
 
 ### Key Findings
 
 - **CatBoost** achieved the best overall performance: **R² = 0.389 ± 0.012**, RMSE = 8.50 mmHg, AUROC = 0.834 for hypertension classification.
 - **SAINT** and **FT-Transformer** achieved comparable performance (R² = 0.383 each), with no statistically significant difference from CatBoost (p = 0.15 and p = 0.16, respectively).
 - **Clinical features** (14 variables) and **laboratory biomarkers** (75 variables) provided the dominant predictive signal, accounting for 52.2% and 36.5% of total feature importance.
-- **Polygenic risk scores** added a modest but consistent 2.4 percentage points of R² beyond clinical and laboratory features.
+- **Polygenic risk scores** added a modest but consistent 2.4 percentage points of R² beyond clinical and laboratory features; genomic features (PRS + PCA) together added 3.1 points.
 - A **performance ceiling** around R² ≈ 0.38–0.39 was observed, independent of model architecture, suggesting this represents the recoverable signal from routine clinical and genomic data.
 
 ---
@@ -83,10 +83,12 @@ We analyzed **14,383 Qatar Biobank participants** using **111 features** across 
 
 ## Data Availability
 
-The individual-level data used in this study are from the **Qatar Biobank (QBB)** and the **Qatar Genome Programme (QGP)**, managed by the **Qatar Precision Health Institute (QPHI)**. Due to participant privacy and institutional data governance policies, the raw data cannot be publicly shared.
+The individual-level data used in this study are from the **Qatar Biobank (QBB)**, managed by the **Qatar Precision Health Institute (QPHI)**. Due to participant privacy and institutional data governance policies, the raw data cannot be publicly shared.
 
 **To request access:**
 Qualified researchers may apply for data access through the Qatar Biobank at [https://www.qatarbiobank.org.qa](https://www.qatarbiobank.org.qa). Access is granted subject to institutional review and a data access agreement.
+
+Polygenic score information and scoring files are available through the [Polygenic Score Catalog](https://www.pgscatalog.org/) (Lambert et al. 2021).
 
 The `config/data_summary.json` file provides summary statistics about the dataset (sample size, feature counts, missingness rates, and outcome distributions) to support reproducibility assessment without individual-level data.
 
@@ -98,13 +100,14 @@ The `config/data_summary.json` file provides summary statistics about the datase
 
 - Python 3.8+
 - CUDA-compatible GPU (for deep tabular models in script 06; CPU fallback available)
+- [PLINK 2.0](https://www.cog-genomics.org/plink/2.0/) (for PRS computation and PCA; used in data preparation)
 
 ### Setup
 
 ```bash
 # Clone the repository
-git clone https://github.com/<your-username>/multimodal-bp-qatar.git
-cd multimodal-bp-qatar
+git clone https://github.com/Minds-R-Lab/Multi-Modal-Qatar-Biobank-.git
+cd Multi-Modal-Qatar-Biobank-
 
 # Create a virtual environment (recommended)
 python -m venv venv
@@ -125,7 +128,7 @@ The pipeline is designed to run sequentially. Each script reads outputs from the
 ```bash
 python scripts/01_data_preparation.py
 ```
-Loads raw QBB data, applies quality-control filters, defines the four feature modalities (clinical, labs, PRS, PCA), excludes blood pressure-derived predictors, and saves the analytical dataset.
+Loads raw QBB data, applies quality-control filters, defines the four feature modalities (clinical, labs, PRS, PCA), excludes blood pressure-derived predictors, and saves the analytical dataset. PRS are computed from published scores in the [PGS Catalog](https://www.pgscatalog.org/), and population-structure PCs are derived from genome-wide SNP data using PLINK 2.0.
 
 ### Step 2: Full ML Pipeline (10 Models)
 ```bash
@@ -257,11 +260,13 @@ If you use this code or find our work useful, please cite:
 
 ```bibtex
 @article{mabrok2026multimodal,
-  title={Multi-Modal Machine Learning for Blood Pressure Prediction in 14,383 Qatar Biobank Participants: Integrating Clinical, Laboratory, Polygenic Risk, and Population-Structure Data},
+  title={Multi-Modal Machine Learning for Blood Pressure Prediction in 14,383
+         Qatar Biobank Participants: Integrating Clinical, Laboratory,
+         Polygenic Risk, and Population-Structure Data},
   author={Mabrok, Mohamed A. and Aldisi, Rana and Zayed, Hatem},
   journal={Artificial Intelligence in Medicine},
   year={2026},
-  note={Submitted}
+  note={Under review}
 }
 ```
 
@@ -271,7 +276,7 @@ If you use this code or find our work useful, please cite:
 
 - **Mohamed A. Mabrok** — Department of Mathematics and Statistics, College of Arts and Sciences, Qatar University, Doha, Qatar
 - **Rana Aldisi** — Department of Biomedical Sciences, College of Health Sciences, QU Health, Qatar University, Doha, Qatar
-- **Hatem Zayed** (Corresponding author) — Department of Biomedical Sciences, College of Health Sciences, QU Health, Qatar University, Doha, Qatar. Email: hatem.zayed@qu.edu.qa
+- **Hatem Zayed*** (Corresponding author) — Department of Biomedical Sciences, College of Health Sciences, QU Health, Qatar University, Doha, Qatar. Email: hatem.zayed@qu.edu.qa
 
 ---
 
@@ -283,4 +288,4 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 ## Acknowledgments
 
-This study was conducted using data from the Qatar Biobank and the Qatar Genome Programme, managed by the Qatar Precision Health Institute (QPHI). We thank all Qatar Biobank participants for their contributions.
+We thank the Qatar Biobank and Qatar Precision Health Institute for providing access to the data used in this study. We thank all Qatar Biobank participants for their contributions.
