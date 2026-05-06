@@ -1,0 +1,38 @@
+# Data (not shared publicly)
+data/
+*.parquet
+*.h5
+*.hdf5
+*.feather
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# CatBoost
+catboost_info/
+
+# Misc
+*.log
+*.tmp

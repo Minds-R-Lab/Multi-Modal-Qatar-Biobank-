@@ -1,0 +1,17 @@
+{
+  "n_participants": 14383,
+  "n_clinical_leak_free": 14,
+  "n_labs": 75,
+  "n_prs": 12,
+  "n_pca": 10,
+  "n_total_leak_free": 111,
+  "n_bp_derived_excluded": 6,
+  "target_MAP_mean": 83.67637720457022,
+  "target_MAP_std": 10.883587177989147,
+  "target_HTN_prevalence": 0.23096711395397343,
+  "missing_pct_labs": 7.824422350460034,
+  "missing_pct_clinical": 0.7156265829699746,
+  "missing_pct_prs": 0.0,
+  "missing_pct_pca": 0.0,
+  "lab_missing_threshold": "70%"
+}

@@ -1,0 +1,63 @@
+Feature,Type
+Age_BMI_interaction,Interaction
+Age_squared,Interaction
+BMI_squared,Interaction
+Age_Sex_interaction,Interaction
+BMI_Sex_interaction,Interaction
+eGFR,Composite
+Age_eGFR,Interaction
+BMI_eGFR,Interaction
+Grip_Weight_Ratio,Interaction
+Grip_BMI_Ratio,Interaction
+Waist_Hip_Ratio,Interaction
+Ratio_Na_K,Interaction
+Ratio_TG_HDL,Interaction
+Ratio_BUN_Cr,Interaction
+Ratio_AST_ALT,Interaction
+Ratio_NLR,Interaction
+PRS_mean,Interaction
+PRS_std,Interaction
+PRS_mean_Age,Interaction
+PRS_mean_BMI,Interaction
+LAB_ALT ( GPT )_log,Interaction
+LAB_AST (GOT)_log,Interaction
+LAB_Activated Partial Thromboplastin Time_log,Interaction
+LAB_Alkaline Phosphatase_log,Interaction
+LAB_Basophil Auto %_log,Interaction
+LAB_Bilirubin Total_log,Interaction
+LAB_C-Peptide_log,Interaction
+LAB_C-Reactive Protein_log,Interaction
+LAB_Creatine Kinase_log,Interaction
+LAB_Creatine Kinase_2_log,Interaction
+LAB_Creatinine_log,Interaction
+LAB_Dihydroxyvitamin D Total_log,Interaction
+LAB_Eosinophil Auto %_log,Interaction
+LAB_Eosinophils Auto #_log,Interaction
+LAB_Estradiol_log,Interaction
+LAB_FSH_log,Interaction
+LAB_Ferritin_log,Interaction
+LAB_Folate_log,Interaction
+LAB_GGT_2_log,Interaction
+LAB_Glucose_log,Interaction
+LAB_HBA 1C %_log,Interaction
+LAB_Homocysteine_log,Interaction
+LAB_Insulin_log,Interaction
+LAB_International Normalization Ratio_log,Interaction
+LAB_LH_log,Interaction
+LAB_Myoglobin_log,Interaction
+LAB_NT-proBNP_log,Interaction
+LAB_Nucleated Red Blood Cells %_log,Interaction
+LAB_Nucleated Red Blood Cells Auto_log,Interaction
+LAB_Prothrombin Time (PT)_log,Interaction
+LAB_RDW_log,Interaction
+LAB_SexHormone Binding Globulin_log,Interaction
+LAB_Thyroid Stimulating Hormone_log,Interaction
+LAB_Triglyceride_log,Interaction
+LAB_Urea_log,Interaction
+LAB_Vitamin B12_log,Interaction
+Pathway_RAAS,Interaction
+Pathway_Inflammation,Interaction
+Pathway_Metabolic,Interaction
+Pathway_Liver,Interaction
+Pathway_Hematology,Interaction
+Pathway_Coagulation,Interaction
