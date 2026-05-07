@@ -264,9 +264,9 @@ If you use this code or find our work useful, please cite:
          Qatar Biobank Participants: Integrating Clinical, Laboratory,
          Polygenic Risk, and Population-Structure Data},
   author={Mabrok, Mohamed A. and Aldisi, Rana and Zayed, Hatem},
-  journal={Artificial Intelligence in Medicine},
+  journal={},
   year={2026},
-  note={Under review}
+  note={}
 }
 ```
 
